@@ -29,7 +29,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #ff8c00 0%, #ff6b35 100%);
             color: white;
             padding: 30px 20px;
             text-align: center;
@@ -303,8 +303,8 @@
         class BitcoinTracker {
             constructor() {
                 this.currentPrice = 0;
-                this.priceChange24h = 0;
-                this.priceChangePercent24h = 0;
+                this.priceChange24hPercent = 0;
+                this.priceChange24hDollar = 0;
                 this.usdToTwdRate = 32.0; // Default rate, will be updated from API
                 
                 this.initializeElements();
@@ -387,7 +387,10 @@
                     
                     if (data.bitcoin) {
                         this.currentPrice = data.bitcoin.usd;
-                        this.priceChange24h = data.bitcoin.usd_24h_change;
+                        this.priceChange24hPercent = data.bitcoin.usd_24h_change;
+                        
+                        // Calculate dollar change from percentage
+                        this.priceChange24hDollar = (this.currentPrice * this.priceChange24hPercent) / 100;
                         
                         this.updatePriceDisplay();
                         this.calculateProfit();
@@ -426,12 +429,12 @@
             updatePriceDisplay() {
                 this.elements.currentPrice.textContent = `$${this.currentPrice.toLocaleString()}`;
                 
-                const changeText = this.priceChange24h >= 0 ? 
-                    `+$${this.priceChange24h.toFixed(2)} (+${this.priceChange24h.toFixed(2)}%)` :
-                    `-$${Math.abs(this.priceChange24h).toFixed(2)} (${this.priceChange24h.toFixed(2)}%)`;
+                const changeText = this.priceChange24hDollar >= 0 ? 
+                    `+$${this.priceChange24hDollar.toFixed(2)} (+${this.priceChange24hPercent.toFixed(2)}%)` :
+                    `-$${Math.abs(this.priceChange24hDollar).toFixed(2)} (${this.priceChange24hPercent.toFixed(2)}%)`;
                 
                 this.elements.priceChange.textContent = changeText;
-                this.elements.priceChange.style.color = this.priceChange24h >= 0 ? '#28a745' : '#dc3545';
+                this.elements.priceChange.style.color = this.priceChange24hDollar >= 0 ? '#00ff00' : '#ff0000';
             }
             
             calculateProfit() {
