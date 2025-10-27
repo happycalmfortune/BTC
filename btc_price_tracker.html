@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>比特幣價格追蹤器與獲利計算器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .btc-price {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .price-change {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px 20px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .profit-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .profit-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .profit-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .profit-item {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .profit-item .label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .profit-item .value {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .profit-positive {
+            color: #28a745;
+        }
+
+        .profit-negative {
+            color: #dc3545;
+        }
+
+        .target-section {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .target-section h3 {
+            color: #1976d2;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .target-profit-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .target-profit-item {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .target-profit-item .label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .target-profit-item .value {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .refresh-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin-top: 20px;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .refresh-btn:active {
+            transform: translateY(0);
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 20px 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .btc-price {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+            
+            .profit-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .target-profit-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>₿ 比特幣追蹤器</h1>
+            <div class="btc-price" id="currentPrice">載入中...</div>
+            <div class="price-change" id="priceChange"></div>
+        </div>
+        
+        <div class="content">
+            <div class="form-group">
+                <label for="purchasePrice">購買價格 ($)</label>
+                <input type="number" id="purchasePrice" placeholder="請輸入您的比特幣購買價格" step="0.01">
+            </div>
+            
+            <div class="form-group">
+                <label for="quantity">數量 (BTC)</label>
+                <input type="number" id="quantity" placeholder="請輸入比特幣數量" step="0.00000001">
+            </div>
+            
+            <div class="profit-section">
+                <h3>目前獲利/虧損</h3>
+                <div class="profit-grid">
+                    <div class="profit-item">
+                        <div class="label">獲利/虧損 ($ / NT$)</div>
+                        <div class="value" id="profitDollar">$0.00 / NT$0</div>
+                    </div>
+                    <div class="profit-item">
+                        <div class="label">獲利/虧損 (%)</div>
+                        <div class="value" id="profitPercent">0.00%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="target-section">
+                <h3>目標價格分析</h3>
+                <div class="form-group">
+                    <label for="targetPrice">目標價格 ($)</label>
+                    <input type="number" id="targetPrice" placeholder="請輸入目標價格" step="0.01">
+                </div>
+                <div class="target-profit-grid">
+                    <div class="target-profit-item">
+                        <div class="label">潛在獲利/虧損 ($ / NT$)</div>
+                        <div class="value" id="targetProfit">$0.00 / NT$0</div>
+                    </div>
+                    <div class="target-profit-item">
+                        <div class="label">潛在獲利/虧損 (%)</div>
+                        <div class="value" id="targetProfitPercent">0.00%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="refresh-btn" id="refreshBtn">更新價格</button>
+        </div>
+    </div>
+
+    <script>
+        class BitcoinTracker {
+            constructor() {
+                this.currentPrice = 0;
+                this.priceChange24h = 0;
+                this.priceChangePercent24h = 0;
+                this.usdToTwdRate = 32.0; // Default rate, will be updated from API
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.loadStoredData();
+                this.fetchCurrentPrice();
+                this.fetchExchangeRate();
+                
+                // Auto-refresh every 30 seconds
+                setInterval(() => {
+                    this.fetchCurrentPrice();
+                    this.fetchExchangeRate();
+                }, 30000);
+            }
+            
+            initializeElements() {
+                this.elements = {
+                    currentPrice: document.getElementById('currentPrice'),
+                    priceChange: document.getElementById('priceChange'),
+                    purchasePrice: document.getElementById('purchasePrice'),
+                    quantity: document.getElementById('quantity'),
+                    profitDollar: document.getElementById('profitDollar'),
+                    profitPercent: document.getElementById('profitPercent'),
+                    targetPrice: document.getElementById('targetPrice'),
+                    targetProfit: document.getElementById('targetProfit'),
+                    targetProfitPercent: document.getElementById('targetProfitPercent'),
+                    refreshBtn: document.getElementById('refreshBtn')
+                };
+            }
+            
+            bindEvents() {
+                this.elements.purchasePrice.addEventListener('input', () => {
+                    this.calculateProfit();
+                    this.calculateTargetProfit();
+                });
+                this.elements.quantity.addEventListener('input', () => {
+                    this.calculateProfit();
+                    this.calculateTargetProfit();
+                });
+                this.elements.targetPrice.addEventListener('input', () => this.calculateTargetProfit());
+                this.elements.refreshBtn.addEventListener('click', () => {
+                    this.fetchCurrentPrice();
+                    this.fetchExchangeRate();
+                });
+            }
+            
+            loadStoredData() {
+                // Load stored purchase price if available
+                const storedPurchasePrice = localStorage.getItem('btc_purchase_price');
+                if (storedPurchasePrice) {
+                    this.elements.purchasePrice.value = storedPurchasePrice;
+                } else {
+                    // Pre-populate with user's purchase price
+                    this.elements.purchasePrice.value = '112530';
+                }
+                
+                // Load stored quantity if available
+                const storedQuantity = localStorage.getItem('btc_quantity');
+                if (storedQuantity) {
+                    this.elements.quantity.value = storedQuantity;
+                } else {
+                    // Pre-populate with user's quantity
+                    this.elements.quantity.value = '0.0479';
+                }
+            }
+            
+            saveData() {
+                localStorage.setItem('btc_purchase_price', this.elements.purchasePrice.value);
+                localStorage.setItem('btc_quantity', this.elements.quantity.value);
+            }
+            
+            async fetchCurrentPrice() {
+                try {
+                    this.elements.refreshBtn.classList.add('loading');
+                    this.elements.refreshBtn.textContent = '載入中...';
+                    
+                    // Using CoinGecko API (free, no API key required)
+                    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
+                    const data = await response.json();
+                    
+                    if (data.bitcoin) {
+                        this.currentPrice = data.bitcoin.usd;
+                        this.priceChange24h = data.bitcoin.usd_24h_change;
+                        
+                        this.updatePriceDisplay();
+                        this.calculateProfit();
+                        this.calculateTargetProfit();
+                        
+                        this.showSuccess('價格更新成功！');
+                    } else {
+                        throw new Error('Invalid response from API');
+                    }
+                } catch (error) {
+                    console.error('Error fetching price:', error);
+                    this.showError('無法取得當前價格，請重試。');
+                } finally {
+                    this.elements.refreshBtn.classList.remove('loading');
+                    this.elements.refreshBtn.textContent = '更新價格';
+                }
+            }
+            
+            async fetchExchangeRate() {
+                try {
+                    // Fetch USD to TWD exchange rate from exchangerate-api
+                    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                    const data = await response.json();
+                    
+                    if (data.rates && data.rates.TWD) {
+                        this.usdToTwdRate = data.rates.TWD;
+                        this.calculateProfit(); // Recalculate with new exchange rate
+                        this.calculateTargetProfit();
+                    }
+                } catch (error) {
+                    console.error('Error fetching exchange rate:', error);
+                    // Keep using default rate if API fails
+                }
+            }
+            
+            updatePriceDisplay() {
+                this.elements.currentPrice.textContent = `$${this.currentPrice.toLocaleString()}`;
+                
+                const changeText = this.priceChange24h >= 0 ? 
+                    `+$${this.priceChange24h.toFixed(2)} (+${this.priceChange24h.toFixed(2)}%)` :
+                    `-$${Math.abs(this.priceChange24h).toFixed(2)} (${this.priceChange24h.toFixed(2)}%)`;
+                
+                this.elements.priceChange.textContent = changeText;
+                this.elements.priceChange.style.color = this.priceChange24h >= 0 ? '#28a745' : '#dc3545';
+            }
+            
+            calculateProfit() {
+                if (!this.currentPrice || !this.elements.purchasePrice.value) return;
+                
+                const purchasePrice = parseFloat(this.elements.purchasePrice.value);
+                const quantity = parseFloat(this.elements.quantity.value) || 1;
+                
+                if (purchasePrice <= 0) return;
+                
+                const currentValue = this.currentPrice * quantity;
+                const purchaseValue = purchasePrice * quantity;
+                const profitDollar = currentValue - purchaseValue;
+                const profitPercent = ((this.currentPrice - purchasePrice) / purchasePrice) * 100;
+                
+                // Convert to Taiwan Dollar
+                const profitTwd = profitDollar * this.usdToTwdRate;
+                
+                this.elements.profitDollar.textContent = `$${profitDollar.toFixed(2)} / NT$${profitTwd.toFixed(0)}`;
+                this.elements.profitPercent.textContent = `${profitPercent.toFixed(2)}%`;
+                
+                // Color coding
+                const profitClass = profitDollar >= 0 ? 'profit-positive' : 'profit-negative';
+                this.elements.profitDollar.className = `value ${profitClass}`;
+                this.elements.profitPercent.className = `value ${profitClass}`;
+                
+                this.saveData();
+            }
+            
+            calculateTargetProfit() {
+                if (!this.currentPrice || !this.elements.targetPrice.value || !this.elements.quantity.value || !this.elements.purchasePrice.value) {
+                    this.elements.targetProfit.textContent = '$0.00 / NT$0';
+                    this.elements.targetProfitPercent.textContent = '0.00%';
+                    return;
+                }
+                
+                const targetPrice = parseFloat(this.elements.targetPrice.value);
+                const quantity = parseFloat(this.elements.quantity.value) || 1;
+                const purchasePrice = parseFloat(this.elements.purchasePrice.value);
+                
+                if (targetPrice <= 0 || purchasePrice <= 0) return;
+                
+                // Calculate total potential profit from purchase price to target price
+                const targetValue = targetPrice * quantity;
+                const purchaseValue = purchasePrice * quantity;
+                const potentialProfit = targetValue - purchaseValue;
+                const potentialProfitPercent = ((targetPrice - purchasePrice) / purchasePrice) * 100;
+                
+                // Convert to Taiwan Dollar
+                const potentialProfitTwd = potentialProfit * this.usdToTwdRate;
+                
+                this.elements.targetProfit.textContent = `$${potentialProfit.toFixed(2)} / NT$${potentialProfitTwd.toFixed(0)}`;
+                this.elements.targetProfitPercent.textContent = `${potentialProfitPercent.toFixed(2)}%`;
+                
+                // Color coding
+                const profitClass = potentialProfit >= 0 ? 'profit-positive' : 'profit-negative';
+                this.elements.targetProfit.className = `value ${profitClass}`;
+                this.elements.targetProfitPercent.className = `value ${profitClass}`;
+            }
+            
+            showError(message) {
+                this.removeMessages();
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.textContent = message;
+                this.elements.refreshBtn.parentNode.insertBefore(errorDiv, this.elements.refreshBtn);
+                
+                setTimeout(() => this.removeMessages(), 5000);
+            }
+            
+            showSuccess(message) {
+                this.removeMessages();
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success';
+                successDiv.textContent = message;
+                this.elements.refreshBtn.parentNode.insertBefore(successDiv, this.elements.refreshBtn);
+                
+                setTimeout(() => this.removeMessages(), 3000);
+            }
+            
+            removeMessages() {
+                const messages = document.querySelectorAll('.error, .success');
+                messages.forEach(msg => msg.remove());
+            }
+        }
+        
+        // Initialize the tracker when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new BitcoinTracker();
+        });
+    </script>
+</body>
+</html>
