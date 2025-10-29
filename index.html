@@ -80,6 +80,22 @@
             border-color: #667eea;
         }
 
+        .scenario-select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .scenario-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .profit-section {
             background: #f8f9fa;
             padding: 20px;
@@ -254,8 +270,16 @@
         
         <div class="content">
             <div class="form-group">
+                <label for="scenarioSelect">選擇情境</label>
+                <select id="scenarioSelect" class="scenario-select">
+                    <option value="F">F</option>
+                    <option value="Q">Q</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
                 <label for="purchasePrice">購買價格 ($)</label>
-                <input type="number" id="purchasePrice" placeholder="請輸入您的比特幣成本" step="0.01">
+                <input type="number" id="purchasePrice" placeholder="請輸入您的比特幣購買價格" step="0.01">
             </div>
             
             <div class="form-group">
@@ -306,6 +330,21 @@
                 this.priceChange24hPercent = 0;
                 this.priceChange24hDollar = 0;
                 this.usdToTwdRate = 32.0; // Default rate, will be updated from API
+                this.currentScenario = 'F';
+                
+                // Scenario data
+                this.scenarios = {
+                    'F': {
+                        name: 'F',
+                        purchasePrice: 112530,
+                        quantity: 0.0479
+                    },
+                    'Q': {
+                        name: 'Q',
+                        purchasePrice: 114877,
+                        quantity: 0.06834
+                    }
+                };
                 
                 this.initializeElements();
                 this.bindEvents();
@@ -324,6 +363,7 @@
                 this.elements = {
                     currentPrice: document.getElementById('currentPrice'),
                     priceChange: document.getElementById('priceChange'),
+                    scenarioSelect: document.getElementById('scenarioSelect'),
                     purchasePrice: document.getElementById('purchasePrice'),
                     quantity: document.getElementById('quantity'),
                     profitDollar: document.getElementById('profitDollar'),
@@ -336,13 +376,16 @@
             }
             
             bindEvents() {
+                this.elements.scenarioSelect.addEventListener('change', () => this.switchScenario());
                 this.elements.purchasePrice.addEventListener('input', () => {
                     this.calculateProfit();
                     this.calculateTargetProfit();
+                    this.saveScenarioData();
                 });
                 this.elements.quantity.addEventListener('input', () => {
                     this.calculateProfit();
                     this.calculateTargetProfit();
+                    this.saveScenarioData();
                 });
                 this.elements.targetPrice.addEventListener('input', () => this.calculateTargetProfit());
                 this.elements.refreshBtn.addEventListener('click', () => {
@@ -352,28 +395,59 @@
             }
             
             loadStoredData() {
-                // Load stored purchase price if available
-                const storedPurchasePrice = localStorage.getItem('btc_purchase_price');
-                if (storedPurchasePrice) {
-                    this.elements.purchasePrice.value = storedPurchasePrice;
-                } else {
-                    // Pre-populate with user's purchase price
-                    this.elements.purchasePrice.value = '112530';
+                // Clear old cached data to force new scenario data
+                localStorage.removeItem('btc_scenario_F');
+                localStorage.removeItem('btc_scenario_Q');
+                localStorage.removeItem('btc_current_scenario');
+                
+                // Load stored scenario
+                const storedScenario = localStorage.getItem('btc_current_scenario');
+                if (storedScenario && this.scenarios[storedScenario]) {
+                    this.currentScenario = storedScenario;
+                    this.elements.scenarioSelect.value = storedScenario;
                 }
                 
-                // Load stored quantity if available
-                const storedQuantity = localStorage.getItem('btc_quantity');
-                if (storedQuantity) {
-                    this.elements.quantity.value = storedQuantity;
-                } else {
-                    // Pre-populate with user's quantity
-                    this.elements.quantity.value = '0.0479';
-                }
+                // Always use default scenario data (force fresh data)
+                const scenario = this.scenarios[this.currentScenario];
+                this.elements.purchasePrice.value = scenario.purchasePrice;
+                this.elements.quantity.value = scenario.quantity;
+                
+                // Save the fresh data
+                this.saveScenarioData();
             }
             
-            saveData() {
-                localStorage.setItem('btc_purchase_price', this.elements.purchasePrice.value);
-                localStorage.setItem('btc_quantity', this.elements.quantity.value);
+            switchScenario() {
+                // Save current scenario data before switching
+                this.saveScenarioData();
+                
+                // Switch to new scenario
+                this.currentScenario = this.elements.scenarioSelect.value;
+                localStorage.setItem('btc_current_scenario', this.currentScenario);
+                
+                // Load new scenario data
+                const scenarioData = localStorage.getItem(`btc_scenario_${this.currentScenario}`);
+                if (scenarioData) {
+                    const data = JSON.parse(scenarioData);
+                    this.elements.purchasePrice.value = data.purchasePrice;
+                    this.elements.quantity.value = data.quantity;
+                } else {
+                    // Use default scenario data
+                    const scenario = this.scenarios[this.currentScenario];
+                    this.elements.purchasePrice.value = scenario.purchasePrice;
+                    this.elements.quantity.value = scenario.quantity;
+                }
+                
+                // Recalculate with new data
+                this.calculateProfit();
+                this.calculateTargetProfit();
+            }
+            
+            saveScenarioData() {
+                const scenarioData = {
+                    purchasePrice: this.elements.purchasePrice.value,
+                    quantity: this.elements.quantity.value
+                };
+                localStorage.setItem(`btc_scenario_${this.currentScenario}`, JSON.stringify(scenarioData));
             }
             
             async fetchCurrentPrice() {
@@ -381,25 +455,85 @@
                     this.elements.refreshBtn.classList.add('loading');
                     this.elements.refreshBtn.textContent = '載入中...';
                     
-                    // Using CoinGecko API (free, no API key required)
-                    const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
-                    const data = await response.json();
+                    // Try using a CORS proxy for better local file compatibility
+                    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                    const targetUrl = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true';
                     
-                    if (data.bitcoin) {
-                        this.currentPrice = data.bitcoin.usd;
-                        this.priceChange24hPercent = data.bitcoin.usd_24h_change;
+                    try {
+                        const response = await fetch(proxyUrl + encodeURIComponent(targetUrl));
                         
-                        // Calculate dollar change from percentage
-                        this.priceChange24hDollar = (this.currentPrice * this.priceChange24hPercent) / 100;
-                        
-                        this.updatePriceDisplay();
-                        this.calculateProfit();
-                        this.calculateTargetProfit();
-                        
-                        this.showSuccess('價格更新成功！');
-                    } else {
-                        throw new Error('Invalid response from API');
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            if (data.bitcoin && data.bitcoin.usd) {
+                                this.currentPrice = data.bitcoin.usd;
+                                this.priceChange24hPercent = data.bitcoin.usd_24h_change || 0;
+                                this.priceChange24hDollar = (this.currentPrice * this.priceChange24hPercent) / 100;
+                                
+                                this.updatePriceDisplay();
+                                this.calculateProfit();
+                                this.calculateTargetProfit();
+                                
+                                this.showSuccess('價格更新成功！');
+                                return;
+                            }
+                        }
+                    } catch (err) {
+                        console.log('CORS proxy failed:', err);
                     }
+                    
+                    // Try direct API call (might work in some browsers)
+                    try {
+                        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true');
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            if (data.bitcoin && data.bitcoin.usd) {
+                                this.currentPrice = data.bitcoin.usd;
+                                this.priceChange24hPercent = data.bitcoin.usd_24h_change || 0;
+                                this.priceChange24hDollar = (this.currentPrice * this.priceChange24hPercent) / 100;
+                                
+                                this.updatePriceDisplay();
+                                this.calculateProfit();
+                                this.calculateTargetProfit();
+                                
+                                this.showSuccess('價格更新成功！');
+                                return;
+                            }
+                        }
+                    } catch (err) {
+                        console.log('Direct API failed:', err);
+                    }
+                    
+                    // Try alternative API (only if we don't have price data yet)
+                    if (!this.currentPrice) {
+                        try {
+                            const response = await fetch('https://api.coinbase.com/v2/exchange-rates?currency=BTC');
+                            
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.data && data.data.rates && data.data.rates.USD) {
+                                    this.currentPrice = parseFloat(data.data.rates.USD);
+                                    this.priceChange24hPercent = 0;
+                                    this.priceChange24hDollar = 0;
+                                    
+                                    this.updatePriceDisplay();
+                                    this.calculateProfit();
+                                    this.calculateTargetProfit();
+                                    
+                                    this.showSuccess('價格更新成功！');
+                                    return;
+                                }
+                            }
+                        } catch (err) {
+                            console.log('Coinbase API failed:', err);
+                        }
+                    }
+                    
+                    // If all APIs fail, show error message
+                    this.showError('無法連接到價格API，請檢查網路連線或稍後重試');
+                    
                 } catch (error) {
                     console.error('Error fetching price:', error);
                     this.showError('無法取得當前價格，請重試。');
@@ -411,15 +545,32 @@
             
             async fetchExchangeRate() {
                 try {
-                    // Fetch USD to TWD exchange rate from exchangerate-api
-                    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                    const data = await response.json();
+                    // Try multiple exchange rate APIs
+                    const exchangeApis = [
+                        'https://api.exchangerate-api.com/v4/latest/USD',
+                        'https://api.fixer.io/latest?base=USD&symbols=TWD',
+                        'https://api.exchangeratesapi.io/latest?base=USD&symbols=TWD'
+                    ];
                     
-                    if (data.rates && data.rates.TWD) {
-                        this.usdToTwdRate = data.rates.TWD;
-                        this.calculateProfit(); // Recalculate with new exchange rate
-                        this.calculateTargetProfit();
+                    for (const api of exchangeApis) {
+                        try {
+                            const response = await fetch(api);
+                            const data = await response.json();
+                            
+                            if (data.rates && data.rates.TWD) {
+                                this.usdToTwdRate = data.rates.TWD;
+                                this.calculateProfit();
+                                this.calculateTargetProfit();
+                                return;
+                            }
+                        } catch (err) {
+                            console.log(`Exchange rate API failed: ${api}`);
+                            continue;
+                        }
                     }
+                    
+                    // If all APIs fail, keep using default rate
+                    console.log('All exchange rate APIs failed, using default rate');
                 } catch (error) {
                     console.error('Error fetching exchange rate:', error);
                     // Keep using default rate if API fails
@@ -427,7 +578,7 @@
             }
             
             updatePriceDisplay() {
-                this.elements.currentPrice.textContent = `$${this.currentPrice.toLocaleString()}`;
+                this.elements.currentPrice.textContent = `$${Math.round(this.currentPrice).toLocaleString()}`;
                 
                 const changeText = this.priceChange24hDollar >= 0 ? 
                     `+$${this.priceChange24hDollar.toFixed(2)} (+${this.priceChange24hPercent.toFixed(2)}%)` :
@@ -528,5 +679,3 @@
     </script>
 </body>
 </html>
-
-
